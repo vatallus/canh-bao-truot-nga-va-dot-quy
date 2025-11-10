@@ -270,96 +270,109 @@ if mode == "📹 Camera":
     # Hiển thị video
     video_placeholder = st.empty()
     
-    # Xử lý camera real-time
-    if st.session_state.camera_active and st.session_state.video_capture:
-        ret, frame = st.session_state.video_capture.read()
-        if ret:
-            # Xử lý frame
+    # Sử dụng st.camera_input cho camera ổn định hơn
+    if st.session_state.camera_active:
+        camera_input = st.camera_input("Camera đang hoạt động", key="camera_stream")
+        
+        if camera_input is not None:
             try:
-                img_result, is_fall = process_frame(frame)
+                # Chuyển đổi từ PIL Image sang numpy array
+                if isinstance(camera_input, Image.Image):
+                    img_array = np.array(camera_input.convert('RGB'))
+                else:
+                    camera_input.seek(0)
+                    img_pil = Image.open(camera_input)
+                    img_array = np.array(img_pil.convert('RGB'))
                 
-                # Cập nhật thống kê nếu phát hiện ngã
-                if is_fall:
-                    current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    # Chỉ thêm vào lịch sử nếu chưa có trong 1 giây gần nhất
-                    if not st.session_state.fall_history or \
-                       (datetime.now() - datetime.strptime(st.session_state.fall_history[-1], "%Y-%m-%d %H:%M:%S")).total_seconds() > 1:
-                        st.session_state.fall_count += 1
-                        st.session_state.fall_history.append(current_time)
-                        st.session_state.last_fall_time = time.time()
-                
-                # Hiển thị kết quả
-                img_result_rgb = cv2.cvtColor(img_result, cv2.COLOR_BGR2RGB)
-                video_placeholder.image(img_result_rgb, channels="RGB", use_container_width=True)
-                
-                # Hiển thị trạng thái với cảnh báo rõ ràng
-                if is_fall:
-                    status_placeholder.markdown(
-                        f"""
-                        <div style='text-align: center; padding: 20px; background-color: #ff4444; border-radius: 10px; border: 5px solid #ff0000;'>
-                            <h1 style='color: white; font-size: 48px; margin: 0; animation: blink 1s infinite;'>🚨 CẢNH BÁO!</h1>
-                            <h2 style='color: white; font-size: 32px; margin: 10px 0;'>PHÁT HIỆN NGÃ</h2>
-                            <p style='color: white; font-size: 18px; margin: 5px 0;'>Thời gian: {datetime.now().strftime("%H:%M:%S")}</p>
-                            <p style='color: white; font-size: 16px; margin: 5px 0; font-weight: bold;'>VUI LÒNG KIỂM TRA NGAY!</p>
-                        </div>
-                        <style>
-                            @keyframes blink {{
-                                0%, 100% {{ opacity: 1; }}
-                                50% {{ opacity: 0.5; }}
-                            }}
-                        </style>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    metric_placeholder.metric("Trạng thái", "🚨 NGÃ", delta="Cảnh báo", delta_color="inverse")
+                # Kiểm tra định dạng và chuyển đổi
+                if len(img_array.shape) == 3 and img_array.shape[2] == 3:
+                    # Đảm bảo là uint8
+                    if img_array.dtype != np.uint8:
+                        if img_array.max() <= 1.0:
+                            img_array = (img_array * 255).astype(np.uint8)
+                        else:
+                            img_array = img_array.astype(np.uint8)
                     
-                    # Hiệu ứng
-                    st.balloons()
-                else:
-                    status_placeholder.markdown(
-                        f"""
-                        <div style='text-align: center; padding: 20px; background-color: #44ff44; border-radius: 10px;'>
-                            <h2 style='color: white; font-size: 32px; margin: 0;'>✅ Bình thường</h2>
-                            <p style='color: white; font-size: 16px; margin: 5px 0;'>Thời gian: {datetime.now().strftime("%H:%M:%S")}</p>
-                        </div>
-                        """,
-                        unsafe_allow_html=True
-                    )
-                    metric_placeholder.metric("Trạng thái", "✅ Bình thường", delta=None)
-                
-                # Xử lý ghi video tự động
-                if auto_record and st.session_state.save_folder:
+                    # Chuyển đổi RGB sang BGR cho OpenCV
+                    img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                    
+                    # Xử lý frame
+                    img_result, is_fall = process_frame(img_bgr)
+                    
+                    # Cập nhật thống kê nếu phát hiện ngã
                     if is_fall:
-                        if not st.session_state.recording:
-                            start_recording(frame)
-                        if st.session_state.video_writer:
-                            st.session_state.video_writer.write(frame)
-                    else:
-                        # Dừng ghi sau 2 giây không phát hiện ngã
-                        if st.session_state.recording:
-                            if st.session_state.last_fall_time:
-                                if time.time() - st.session_state.last_fall_time > 2:
-                                    stop_recording()
-                
-                # Hiển thị trạng thái ghi
-                if st.session_state.recording:
-                    st.sidebar.warning("🔴 Đang ghi video...")
+                        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        # Chỉ thêm vào lịch sử nếu chưa có trong 1 giây gần nhất
+                        if not st.session_state.fall_history or \
+                           (datetime.now() - datetime.strptime(st.session_state.fall_history[-1], "%Y-%m-%d %H:%M:%S")).total_seconds() > 1:
+                            st.session_state.fall_count += 1
+                            st.session_state.fall_history.append(current_time)
+                            st.session_state.last_fall_time = time.time()
+                    
+                    # Hiển thị kết quả
+                    col1, col2 = st.columns([2, 1])
+                    
+                    with col1:
+                        img_result_rgb = cv2.cvtColor(img_result, cv2.COLOR_BGR2RGB)
+                        st.image(img_result_rgb, caption="Kết quả phát hiện", use_container_width=True)
+                    
+                    with col2:
+                        # Hiển thị trạng thái với cảnh báo rõ ràng (không nhấp nháy)
+                        if is_fall:
+                            status_placeholder.markdown(
+                                f"""
+                                <div style='text-align: center; padding: 20px; background-color: #ff4444; border-radius: 10px; border: 5px solid #ff0000;'>
+                                    <h1 style='color: white; font-size: 48px; margin: 0;'>🚨 CẢNH BÁO!</h1>
+                                    <h2 style='color: white; font-size: 32px; margin: 10px 0;'>PHÁT HIỆN NGÃ</h2>
+                                    <p style='color: white; font-size: 18px; margin: 5px 0;'>Thời gian: {datetime.now().strftime("%H:%M:%S")}</p>
+                                    <p style='color: white; font-size: 16px; margin: 5px 0; font-weight: bold;'>VUI LÒNG KIỂM TRA NGAY!</p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                            metric_placeholder.metric("Trạng thái", "🚨 NGÃ", delta="Cảnh báo", delta_color="inverse")
+                            
+                            # Hiệu ứng chỉ chạy một lần
+                            if 'last_fall_display' not in st.session_state or st.session_state.last_fall_display != current_time:
+                                st.balloons()
+                                st.session_state.last_fall_display = current_time
+                        else:
+                            status_placeholder.markdown(
+                                f"""
+                                <div style='text-align: center; padding: 20px; background-color: #44ff44; border-radius: 10px;'>
+                                    <h2 style='color: white; font-size: 32px; margin: 0;'>✅ Bình thường</h2>
+                                    <p style='color: white; font-size: 16px; margin: 5px 0;'>Thời gian: {datetime.now().strftime("%H:%M:%S")}</p>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                            metric_placeholder.metric("Trạng thái", "✅ Bình thường", delta=None)
+                        
+                        # Xử lý ghi video tự động
+                        if auto_record and st.session_state.save_folder:
+                            if is_fall:
+                                if not st.session_state.recording:
+                                    start_recording(img_bgr)
+                                if st.session_state.video_writer:
+                                    st.session_state.video_writer.write(img_bgr)
+                            else:
+                                # Dừng ghi sau 2 giây không phát hiện ngã
+                                if st.session_state.recording:
+                                    if st.session_state.last_fall_time:
+                                        if time.time() - st.session_state.last_fall_time > 2:
+                                            stop_recording()
+                            
+                            # Hiển thị trạng thái ghi
+                            if st.session_state.recording:
+                                st.sidebar.warning("🔴 Đang ghi video...")
+                            else:
+                                st.sidebar.info("⏸️ Không ghi")
                 else:
-                    st.sidebar.info("⏸️ Không ghi")
-                
-                # Tự động rerun để cập nhật frame tiếp theo
-                if st.session_state.camera_active:
-                    time.sleep(0.03)  # ~30 FPS
-                    st.rerun()
-                
+                    st.error(f"❌ Lỗi: Không thể xử lý hình ảnh từ camera. Shape: {img_array.shape if 'img_array' in locals() else 'N/A'}")
             except Exception as e:
-                st.error(f"❌ Lỗi xử lý frame: {str(e)}")
+                st.error(f"❌ Lỗi xử lý camera: {str(e)}")
                 st.exception(e)
-        else:
-            st.warning("⚠️ Không thể đọc frame từ camera.")
-            st.session_state.camera_active = False
-    
-    elif not st.session_state.camera_active:
+    else:
         # Hiển thị placeholder khi camera chưa bật
         st.info("👆 Nhấn 'Bắt đầu Camera' để bắt đầu phát hiện ngã")
         video_placeholder.image("GUI/images/backgroud-placeholder.png" if os.path.exists("GUI/images/backgroud-placeholder.png") else None, 
