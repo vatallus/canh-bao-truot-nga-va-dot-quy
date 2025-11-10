@@ -64,7 +64,7 @@ with st.sidebar:
     # Chọn chế độ
     mode = st.radio(
         "Chọn chế độ:",
-        ["📹 Camera", "📁 Video File", "🖼️ Image"],
+        ["📹 Camera", "📁 Video File", "🖼️ Image", "🧪 Test Dataset"],
         index=0
     )
     
@@ -540,6 +540,258 @@ elif mode == "🖼️ Image":
         except Exception as e:
             st.error(f"❌ Lỗi xử lý hình ảnh: {str(e)}")
             st.exception(e)
+
+elif mode == "🧪 Test Dataset":
+    st.subheader("🧪 Chế độ Test Dataset")
+    
+    dataset_path = "Dataset_test"
+    
+    if not os.path.exists(dataset_path):
+        st.error(f"❌ Không tìm thấy thư mục dataset tại: {dataset_path}")
+    else:
+        # Chọn loại test
+        test_type = st.radio(
+            "Chọn loại test:",
+            ["🖼️ Test Images", "📹 Test Videos", "📊 Test All"],
+            index=0
+        )
+        
+        if test_type == "🖼️ Test Images":
+            images_path = os.path.join(dataset_path, "images")
+            if os.path.exists(images_path):
+                image_files = sorted([f for f in os.listdir(images_path) 
+                                    if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+                
+                if image_files:
+                    st.info(f"📁 Tìm thấy {len(image_files)} hình ảnh trong dataset")
+                    
+                    # Chọn hình ảnh để test
+                    selected_image = st.selectbox("Chọn hình ảnh để test:", image_files)
+                    
+                    if selected_image:
+                        image_path = os.path.join(images_path, selected_image)
+                        
+                        # Hiển thị và xử lý
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.subheader("Hình ảnh gốc")
+                            image = Image.open(image_path)
+                            st.image(image, caption=selected_image, use_container_width=True)
+                        
+                        with col2:
+                            st.subheader("Kết quả phát hiện")
+                            img_array = np.array(image)
+                            
+                            if len(img_array.shape) == 3:
+                                img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                            else:
+                                img_bgr = img_array
+                            
+                            try:
+                                img_result, is_fall = process_frame(img_bgr)
+                                img_result_rgb = cv2.cvtColor(img_result, cv2.COLOR_BGR2RGB)
+                                st.image(img_result_rgb, caption="Kết quả", use_container_width=True)
+                                
+                                # Hiển thị trạng thái
+                                if is_fall:
+                                    st.error("🚨 **PHÁT HIỆN NGÃ!**")
+                                else:
+                                    st.success("✅ **Bình thường**")
+                            except Exception as e:
+                                st.error(f"❌ Lỗi xử lý: {str(e)}")
+                    
+                    # Test tất cả hình ảnh
+                    if st.button("🧪 Test Tất Cả Hình Ảnh"):
+                        st.subheader("📊 Kết quả Test Tất Cả Hình Ảnh")
+                        
+                        results = []
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        for idx, img_file in enumerate(image_files):
+                            img_path = os.path.join(images_path, img_file)
+                            try:
+                                image = Image.open(img_path)
+                                img_array = np.array(image)
+                                
+                                if len(img_array.shape) == 3:
+                                    img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                                else:
+                                    img_bgr = img_array
+                                
+                                _, is_fall = process_frame(img_bgr)
+                                results.append({
+                                    'file': img_file,
+                                    'fall_detected': is_fall,
+                                    'status': '🚨 NGÃ' if is_fall else '✅ Bình thường'
+                                })
+                                
+                                progress_bar.progress((idx + 1) / len(image_files))
+                                status_text.text(f"Đang xử lý: {img_file} ({idx + 1}/{len(image_files)})")
+                            except Exception as e:
+                                results.append({
+                                    'file': img_file,
+                                    'fall_detected': None,
+                                    'status': f'❌ Lỗi: {str(e)}'
+                                })
+                        
+                        # Hiển thị kết quả
+                        import pandas as pd
+                        df = pd.DataFrame(results)
+                        st.dataframe(df, use_container_width=True)
+                        
+                        # Thống kê
+                        total = len(results)
+                        fall_count = sum(1 for r in results if r['fall_detected'] == True)
+                        normal_count = sum(1 for r in results if r['fall_detected'] == False)
+                        error_count = sum(1 for r in results if r['fall_detected'] is None)
+                        
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Tổng số", total)
+                        with col2:
+                            st.metric("Phát hiện ngã", fall_count, delta=f"{fall_count/total*100:.1f}%")
+                        with col3:
+                            st.metric("Bình thường", normal_count, delta=f"{normal_count/total*100:.1f}%")
+                        with col4:
+                            st.metric("Lỗi", error_count)
+                else:
+                    st.warning("⚠️ Không tìm thấy hình ảnh trong dataset")
+            else:
+                st.error(f"❌ Không tìm thấy thư mục images tại: {images_path}")
+        
+        elif test_type == "📹 Test Videos":
+            videos_path = os.path.join(dataset_path, "videos")
+            if os.path.exists(videos_path):
+                video_files = sorted([f for f in os.listdir(videos_path) 
+                                    if f.lower().endswith(('.mp4', '.avi', '.mov', '.mkv'))])
+                
+                if video_files:
+                    st.info(f"📁 Tìm thấy {len(video_files)} video trong dataset")
+                    
+                    # Chọn video để test
+                    selected_video = st.selectbox("Chọn video để test:", video_files)
+                    
+                    if selected_video:
+                        video_path = os.path.join(videos_path, selected_video)
+                        
+                        if st.button("▶️ Bắt đầu Test Video"):
+                            video_capture = cv2.VideoCapture(video_path)
+                            
+                            if not video_capture.isOpened():
+                                st.error("❌ Không thể mở file video.")
+                            else:
+                                fps = int(video_capture.get(cv2.CAP_PROP_FPS)) or 30
+                                total_frames = int(video_capture.get(cv2.CAP_PROP_FRAME_COUNT))
+                                
+                                progress_bar = st.progress(0)
+                                status_text = st.empty()
+                                video_placeholder = st.empty()
+                                
+                                frame_count = 0
+                                fall_frames = []
+                                
+                                while True:
+                                    ret, frame = video_capture.read()
+                                    if not ret:
+                                        break
+                                    
+                                    try:
+                                        img_result, is_fall = process_frame(frame)
+                                        
+                                        if is_fall:
+                                            fall_frames.append(frame_count)
+                                        
+                                        img_result_rgb = cv2.cvtColor(img_result, cv2.COLOR_BGR2RGB)
+                                        video_placeholder.image(img_result_rgb, channels="RGB", use_container_width=True)
+                                        
+                                        frame_count += 1
+                                        progress = frame_count / total_frames if total_frames > 0 else 0
+                                        progress_bar.progress(progress)
+                                        
+                                        status_text.text(f"Frame {frame_count}/{total_frames} - Phát hiện ngã: {len(fall_frames)} lần")
+                                        
+                                        time.sleep(1.0 / fps)
+                                    except Exception as e:
+                                        st.error(f"❌ Lỗi xử lý frame: {str(e)}")
+                                        break
+                                
+                                video_capture.release()
+                                
+                                # Kết quả
+                                st.success(f"✅ Đã xử lý xong video!")
+                                if fall_frames:
+                                    st.warning(f"🚨 Phát hiện ngã tại {len(fall_frames)} frame(s): {fall_frames[:10]}{'...' if len(fall_frames) > 10 else ''}")
+                                else:
+                                    st.info("✅ Không phát hiện ngã trong video")
+                else:
+                    st.warning("⚠️ Không tìm thấy video trong dataset")
+            else:
+                st.error(f"❌ Không tìm thấy thư mục videos tại: {videos_path}")
+        
+        elif test_type == "📊 Test All":
+            st.subheader("📊 Test Toàn Bộ Dataset")
+            
+            if st.button("🚀 Bắt Đầu Test Tất Cả", type="primary"):
+                results_summary = {
+                    'images': {'total': 0, 'fall': 0, 'normal': 0, 'error': 0},
+                    'videos': {'total': 0, 'fall': 0, 'normal': 0, 'error': 0}
+                }
+                
+                # Test images
+                images_path = os.path.join(dataset_path, "images")
+                if os.path.exists(images_path):
+                    image_files = sorted([f for f in os.listdir(images_path) 
+                                        if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
+                    results_summary['images']['total'] = len(image_files)
+                    
+                    progress = st.progress(0)
+                    status = st.empty()
+                    
+                    for idx, img_file in enumerate(image_files):
+                        img_path = os.path.join(images_path, img_file)
+                        try:
+                            image = Image.open(img_path)
+                            img_array = np.array(image)
+                            
+                            if len(img_array.shape) == 3:
+                                img_bgr = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
+                            else:
+                                img_bgr = img_array
+                            
+                            _, is_fall = process_frame(img_bgr)
+                            
+                            if is_fall:
+                                results_summary['images']['fall'] += 1
+                            else:
+                                results_summary['images']['normal'] += 1
+                        except Exception as e:
+                            results_summary['images']['error'] += 1
+                        
+                        progress.progress((idx + 1) / len(image_files))
+                        status.text(f"Đang xử lý hình ảnh: {img_file} ({idx + 1}/{len(image_files)})")
+                
+                # Hiển thị kết quả
+                st.success("✅ Đã hoàn thành test dataset!")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.subheader("📊 Kết quả Hình Ảnh")
+                    img_total = results_summary['images']['total']
+                    if img_total > 0:
+                        st.metric("Tổng số", img_total)
+                        st.metric("Phát hiện ngã", results_summary['images']['fall'], 
+                                delta=f"{results_summary['images']['fall']/img_total*100:.1f}%")
+                        st.metric("Bình thường", results_summary['images']['normal'],
+                                delta=f"{results_summary['images']['normal']/img_total*100:.1f}%")
+                        if results_summary['images']['error'] > 0:
+                            st.metric("Lỗi", results_summary['images']['error'])
+                
+                with col2:
+                    st.subheader("📊 Kết quả Video")
+                    st.info("Tính năng test video tự động đang được phát triển")
 
 # Footer
 st.markdown("---")
