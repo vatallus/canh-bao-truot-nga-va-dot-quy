@@ -22,3 +22,8 @@ matplotlib
 seaborn
 scipy
 requests
+# Streamlit và dependencies cho giao diện web
+streamlit
+streamlit-webrtc
+opencv-python-headless
+huggingface_hub
