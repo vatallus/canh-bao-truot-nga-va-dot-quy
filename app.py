@@ -294,7 +294,7 @@ if mode == "📹 Camera":
                 
                 # Hiển thị trạng thái với cảnh báo rõ ràng
                 if is_fall:
-                    status_placeholder.error(
+                    status_placeholder.markdown(
                         f"""
                         <div style='text-align: center; padding: 20px; background-color: #ff4444; border-radius: 10px; border: 5px solid #ff0000;'>
                             <h1 style='color: white; font-size: 48px; margin: 0; animation: blink 1s infinite;'>🚨 CẢNH BÁO!</h1>
@@ -316,7 +316,7 @@ if mode == "📹 Camera":
                     # Hiệu ứng
                     st.balloons()
                 else:
-                    status_placeholder.success(
+                    status_placeholder.markdown(
                         f"""
                         <div style='text-align: center; padding: 20px; background-color: #44ff44; border-radius: 10px;'>
                             <h2 style='color: white; font-size: 32px; margin: 0;'>✅ Bình thường</h2>
@@ -429,12 +429,24 @@ elif mode == "📁 Video File":
                     
                     # Hiển thị trạng thái
                     if is_fall:
-                        status_text.error(
-                            f"🚨 **PHÁT HIỆN NGÃ!** - Frame {frame_count}/{total_frames} - Thời gian: {datetime.now().strftime('%H:%M:%S')}"
+                        status_text.markdown(
+                            f"""
+                            <div style='text-align: center; padding: 15px; background-color: #ff4444; border-radius: 10px; border: 3px solid #ff0000;'>
+                                <h2 style='color: white; font-size: 24px; margin: 0;'>🚨 PHÁT HIỆN NGÃ!</h2>
+                                <p style='color: white; font-size: 14px; margin: 5px 0;'>Frame {frame_count}/{total_frames} - Thời gian: {datetime.now().strftime('%H:%M:%S')}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
                         )
                     else:
-                        status_text.success(
-                            f"✅ **Bình thường** - Frame {frame_count}/{total_frames}"
+                        status_text.markdown(
+                            f"""
+                            <div style='text-align: center; padding: 15px; background-color: #44ff44; border-radius: 10px;'>
+                                <h2 style='color: white; font-size: 24px; margin: 0;'>✅ Bình thường</h2>
+                                <p style='color: white; font-size: 14px; margin: 5px 0;'>Frame {frame_count}/{total_frames}</p>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
                         )
                     
                     time.sleep(1.0 / fps)  # Giữ tốc độ video gốc
@@ -485,19 +497,25 @@ elif mode == "🖼️ Image":
             
             # Hiển thị trạng thái
             if is_fall:
-                st.error(
+                st.markdown(
                     f"""
-                    <div style='text-align: center; padding: 20px; background-color: #ff4444; border-radius: 10px;'>
-                        <h1 style='color: white; font-size: 48px; margin: 0;'>🚨 CẢNH BÁO!</h1>
+                    <div style='text-align: center; padding: 20px; background-color: #ff4444; border-radius: 10px; border: 5px solid #ff0000;'>
+                        <h1 style='color: white; font-size: 48px; margin: 0; animation: blink 1s infinite;'>🚨 CẢNH BÁO!</h1>
                         <h2 style='color: white; font-size: 32px; margin: 10px 0;'>PHÁT HIỆN NGÃ</h2>
                         <p style='color: white; font-size: 18px; margin: 5px 0;'>Thời gian: {datetime.now().strftime("%H:%M:%S")}</p>
                     </div>
+                    <style>
+                        @keyframes blink {{
+                            0%, 100% {{ opacity: 1; }}
+                            50% {{ opacity: 0.5; }}
+                        }}
+                    </style>
                     """,
                     unsafe_allow_html=True
                 )
                 st.balloons()
             else:
-                st.success(
+                st.markdown(
                     f"""
                     <div style='text-align: center; padding: 20px; background-color: #44ff44; border-radius: 10px;'>
                         <h2 style='color: white; font-size: 32px; margin: 0;'>✅ Bình thường</h2>
